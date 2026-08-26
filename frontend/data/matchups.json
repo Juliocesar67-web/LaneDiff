@@ -1,0 +1,28 @@
+[
+  {
+    "id": "c8d0e722-1234-4a56-8b90-111111111111",
+    "my_champion": "Ahri",
+    "enemy_champion": "Zed",
+    "difficulty": 6,
+    "tips": [
+      "Hold your Charm (E) for when Zed uses Death Mark (R)—he always lands directly behind you.",
+      "Rush early Armor (Seeker's Armguard or Zhonya's Hourglass).",
+      "Punish him with basic attacks when his Shadow (W) is on its ~20s cooldown."
+    ],
+    "recommended_first": "doran's Ring",
+    "recommended_rush": "Zhonya's Hourglass"
+  },
+  {
+    "id": "d9e1f833-5678-4b90-9c01-222222222222",
+    "my_champion": "Ahri",
+    "enemy_champion": "Yasuo",
+    "difficulty": 6,
+    "tips": [
+      "Pop his passive shield with a basic attack before committing your spell combo.",
+      "Do not throw Charm directly into his Wind Wall (W).",
+      "Bait his dashes away from your minion wave."
+    ],
+    "recommended_first": "doran's Ring",
+    "recommended_rush": "Malignance"
+  }
+]
