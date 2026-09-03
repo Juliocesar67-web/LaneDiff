@@ -1,0 +1,99 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 1. Next.js / TypeScript Client
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+// 2. Python Client
+generator py_client {
+  provider  = "prisma-client-py"
+  interface = "asyncio" // Matches your Python asyncio pipeline
+}
+
+model Champion {
+  id        String  @id @default(uuid())
+  name      String  @unique
+  winrate   Float?
+  main_role String?
+
+  // Relations
+  stats         Stat[]
+  mainMatchups  Matchup[] @relation("MainChampion")
+  enemyMatchups Matchup[] @relation("EnemyChampion")
+
+  @@map("champions")
+}
+
+model Stat {
+  id          String @id @default(uuid())
+  championId  String
+  patch       String
+  elo         String
+  role        String
+  winrate     Float?
+  total_games Int?
+
+  // Relations
+  champion Champion @relation(fields: [championId], references: [id], onDelete: Cascade)
+
+  @@map("stats")
+}
+
+model Setup {
+  id              String    @id @default(uuid())
+  matchupId       String
+  build_path      Json      @db.JsonB
+  rune_tree       Json      @db.JsonB
+  summoner_spells Json      @db.JsonB
+  skill_order     Json      @db.JsonB
+  created_at      DateTime? @default(now())
+
+  // Relations
+  matchup Matchup @relation(fields: [matchupId], references: [id], onDelete: Cascade)
+
+  @@map("setups")
+}
+
+model Matchup {
+  id              String    @id @default(uuid())
+  mainChampionId  String
+  enemyChampionId String
+  patch           String
+  elo             String
+  winrate         Float?
+  total_games     Int?
+  gold_diff_15    Float?
+  cs_diff_15      Float?
+  xp_diff_15      Float?
+  created_at      DateTime? @default(now())
+
+  // Relations
+  mainChampion  Champion @relation("MainChampion", fields: [mainChampionId], references: [id], onDelete: Cascade)
+  enemyChampion Champion @relation("EnemyChampion", fields: [enemyChampionId], references: [id], onDelete: Cascade)
+  setups        Setup[]
+
+  @@map("matchups")
+}
+
+model MatchQueue {
+  id        String   @id
+  status    Status   @default(PENDING)
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  @@map("match_queue")
+}
+
+enum Status {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}

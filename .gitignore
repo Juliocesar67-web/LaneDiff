@@ -30,3 +30,4 @@ npm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+/generated/prisma
