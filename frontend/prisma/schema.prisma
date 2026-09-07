@@ -35,7 +35,7 @@ model Champion {
 
 model Stat {
   id          String @id @default(uuid())
-  championId  String
+  championId  String @map("champion_id")
   patch       String
   elo         String
   role        String
@@ -65,8 +65,8 @@ model Setup {
 
 model Matchup {
   id              String    @id @default(uuid())
-  mainChampionId  String
-  enemyChampionId String
+  mainChampionId  String    @map("main_champion_id")
+  enemyChampionId String    @map("enemy_champion_id")
   patch           String
   elo             String
   winrate         Float?
@@ -90,6 +90,17 @@ model MatchQueue {
   fetchedAt DateTime @default(now()) @map("fetched_at")
 
   @@map("match_queue")
+}
+
+model Patch {
+  id        Int       @id @default(autoincrement())
+  version   String    @unique // e.g., "16.4"
+  startTime DateTime  @map("start_time")
+  endTime   DateTime? @map("end_time")
+  isCurrent Boolean   @default(false) @map("is_current")
+
+  @@index([isCurrent])
+  @@map("patches")
 }
 
 enum Status {
