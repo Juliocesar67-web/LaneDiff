@@ -36,13 +36,14 @@ model Champion {
 model Stat {
   id          String @id @default(uuid())
   championId  String @map("champion_id")
-  patch       String
+  patchId     Int    @map("patch_id")
   elo         String
   role        String
   winrate     Float?
   total_games Int?
 
   // Relations
+  patch    Patch    @relation(fields: [patchId], references: [id], onDelete: Cascade)
   champion Champion @relation(fields: [championId], references: [id], onDelete: Cascade)
 
   @@map("stats")
@@ -67,7 +68,7 @@ model Matchup {
   id              String    @id @default(uuid())
   mainChampionId  String    @map("main_champion_id")
   enemyChampionId String    @map("enemy_champion_id")
-  patch           String
+  patchId         Int       @map("patch_id")
   elo             String
   winrate         Float?
   total_games     Int?
@@ -77,6 +78,7 @@ model Matchup {
   created_at      DateTime? @default(now())
 
   // Relations
+  patch         Patch    @relation(fields: [patchId], references: [id], onDelete: Cascade)
   mainChampion  Champion @relation("MainChampion", fields: [mainChampionId], references: [id], onDelete: Cascade)
   enemyChampion Champion @relation("EnemyChampion", fields: [enemyChampionId], references: [id], onDelete: Cascade)
   setups        Setup[]
@@ -98,6 +100,9 @@ model Patch {
   startTime DateTime  @map("start_time")
   endTime   DateTime? @map("end_time")
   isCurrent Boolean   @default(false) @map("is_current")
+
+  stats    Stat[]
+  matchups Matchup[]
 
   @@index([isCurrent])
   @@map("patches")

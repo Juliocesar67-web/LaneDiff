@@ -1,22 +1,10 @@
-import requests
-from dotenv import load_dotenv, dotenv_values
 import os
-import time
 import asyncio
 import httpx
 import asyncpg
 
-load_dotenv()
-HEADERS = {"X-Riot-Token": os.getenv("API_KEY")}
-SEMAPHORE = asyncio.Semaphore(10)
-pause_until = time.time()  # Global variable to track the pause time for rate limiting
-ranks = {
-    "CHALLENGER": "challengerleagues",
-    "GRANDMASTER": "grandmasterleagues",
-    "MASTER": "masterleagues",
-}
-
-regions = ["euw1", "na1", "kr", "br1", "jp1", "la1", "la2", "oc1", "ru", "tr1"]
+from config import RANKS
+from riot_api import fetch_with_rate_limit
 
 
 async def get_players(
@@ -48,57 +36,35 @@ async def get_games_from_player(
     client: httpx.AsyncClient, pool: asyncpg.Pool, puuid, params: dict
 ):
     url = f"https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids"
+    all_match_ids = []
+    start_index = params.get("start", 0)
+    batch_size = min(params.get("count", 100), 100)
+    request_params = params.copy()
+    request_params["count"] = batch_size
+    while True:
+        request_params["start"] = start_index
+        response = await fetch_with_rate_limit(client, url, request_params)
+        if not response:
+            return []
+        print(f"start count:{request_params['start']}.{response}")
+        try:
+            await pool.execute(
+                """
+                INSERT INTO match_queue (id)
+                SELECT * FROM unnest($1::text[])
+                ON CONFLICT (id) DO NOTHING;
+                """,
+                response,
+            )
+        except Exception as e:
+            print(f"Error inserting game in db: {e}")
 
-    response = await fetch_with_rate_limit(client, url, params)
-    print(response)
-    if response is None:
-        return []
+        all_match_ids.extend(response)
+        if len(response) < batch_size:
+            break
+        start_index += batch_size
 
-    try:
-        match_ids = await pool.execute(
-            """
-            INSERT INTO match_queue (id)
-            SELECT * FROM unnest($1::text[])
-            ON CONFLICT (id) DO NOTHING;
-            """,
-            response,
-        )
-
-    except Exception as e:
-        print(f"Error inserting game in db: {e}")
-    return response
-
-
-async def fetch_with_rate_limit(client: httpx.AsyncClient, url: str, params: dict):
-    """Executes GET requests with automatic HTTP 429 retry backoff."""
-    global pause_until
-    async with SEMAPHORE:
-        while True:
-            now = time.time()
-            if now < pause_until:
-                await asyncio.sleep(pause_until - now)
-            try:
-                response = await client.get(
-                    url, headers=HEADERS, params=params, timeout=10.0
-                )
-
-                # Rate limited: read Riot's requested sleep duration and retry
-                if response.status_code == 429:
-                    retry_after = int(response.headers.get("Retry-After", 5))
-                    pause_until = max(pause_until, time.time() + retry_after)
-                    print(f"[429 Rate Limit] Backing off for {retry_after}s...")
-                    await asyncio.sleep(retry_after)
-                    continue
-
-                if response.status_code == 200:
-                    return response.json()
-
-                print(f"API Error {response.status_code}: {response.text}")
-                return None
-
-            except httpx.RequestError as exc:
-                print(f"Network error occurred: {exc}. Retrying in 2s...")
-                await asyncio.sleep(2)
+    return all_match_ids
 
 
 async def get_patch_dates(pool: asyncpg.Pool):
@@ -124,11 +90,12 @@ async def get_patch_dates(pool: asyncpg.Pool):
 
 
 async def main():
-    pool = await asyncpg.create_pool(os.getenv("DATABASE_URL"))
+    pool = await asyncpg.create_pool(os.getenv("DATABASE_URL"), min_size=5, max_size=15)
     start_epoch, end_epoch = await get_patch_dates(pool)
+    print(f"Start epoch: {start_epoch}, End epoch: {end_epoch}")
     async with httpx.AsyncClient() as client:
         chall_players = await get_players(
-            client, "euw1", ranks["CHALLENGER"], "RANKED_SOLO_5x5"
+            client, "euw1", RANKS["CHALLENGER"], "RANKED_SOLO_5x5"
         )
 
         if chall_players:
@@ -146,7 +113,7 @@ async def main():
                         "count": 100,
                     },
                 )
-                for player in chall_players.get("entries", [])[:10]
+                for player in chall_players.get("entries", [])
             ]
             games_list = await asyncio.gather(*tasks)
             print(games_list)
